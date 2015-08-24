@@ -69,9 +69,7 @@ func main() {
 			Name:    "install",
 			Aliases: []string{"i"},
 			Usage:   "chm install <package> ",
-			Action: func(c *cli.Context) {
-				println("installed package: ", c.Args().First())
-			},
+			Action:  installAction,
 		},
 		{
 			Name:    "search",
@@ -108,6 +106,12 @@ func main() {
 			Aliases: []string{"cu"},
 			Usage:   "chm init",
 			Action:  updateuserAction,
+		},
+		{
+			Name:    "resetpassord",
+			Aliases: []string{"rp"},
+			Usage:   "chm resetpassword",
+			Action:  resetpassordAction,
 		},
 		{
 			Name:    "run",
@@ -162,11 +166,35 @@ tags: [web, framework]
 	}
 }
 
+func installAction(c *cli.Context) {
+	q := c.Args().First()
+	u := "http://plasti.co:3000/packages/" + q
+	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
+	request.Get(u).
+		End(func(resp gorequest.Response, body string, errs []error) {
+		if resp.StatusCode == 200 {
+			println(body)
+			p := Package{}
+
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				log.Fatalf("no config found", err)
+				return
+			} else {
+				log.Println(p)
+			}
+
+			println("Package installed successfully!\n")
+		} else {
+			println(body)
+		}
+	})
+}
+
 func publishAction(c *cli.Context) {
 	if CurrentUser.Email == "" {
 		message := `
         Please create a user account first, run 'chm adduser'
-        If you already have an account, please run 'chm update user'
+        If you already have an account, please run 'chm updateuser'
 `
 		println(message)
 		return
@@ -261,6 +289,54 @@ func adduserAction(c *cli.Context) {
 			}
 		}
 	}
+}
+func resetpassordAction(c *cli.Context) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter email: ")
+	email, _ := reader.ReadString('\n')
+	email = strings.Replace(email, "\n", "", -1)
+
+	u := "http://plasti.co:3000/users/" + email + "/reset-password"
+	request := gorequest.New()
+	request.Post(u).
+		End(func(resp gorequest.Response, body string, errs []error) {
+		if resp.StatusCode == 200 {
+			fmt.Print("Please check your email, copy the token and paste it here: ")
+			token, _ := reader.ReadString('\n')
+			token = strings.Replace(token, "\n", "", -1)
+			fmt.Printf("Password: ")
+			pass := gopass.GetPasswd() // Silent, for *'s use gopass.GetPasswdMasked()
+			password := strings.Replace(string(pass), "\n", "", -1)
+
+			resetPassword(email, token, password)
+		} else {
+			println(body)
+		}
+	})
+}
+
+func resetPassword(email, token, password string) {
+	log.Println(email, token, password)
+	u := "http://plasti.co:3000/users/" + email + "/reset-password/" + token
+	request := gorequest.New()
+	request.Put(u).
+		Send(User{Password: password}).
+		End(func(resp gorequest.Response, body string, errs []error) {
+		if resp.StatusCode == 200 {
+			fmt.Print("Your password has been updated successfully!")
+			user := User{}
+			err := json.Unmarshal([]byte(body), &user)
+			if err != nil {
+				log.Fatalf("no config found", err)
+				return
+			}
+			user.Password = password
+			CurrentUser = user
+			createCHMDir(user.Handle, user.Email, user.Password)
+		} else {
+			println(body)
+		}
+	})
 }
 
 func promptUserInfo(c *cli.Context, update bool) (string, string, string, error) {
