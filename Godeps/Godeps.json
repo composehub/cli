@@ -1,0 +1,11 @@
+{
+	"ImportPath": "github.com/patcito/composehub",
+	"GoVersion": "go1.5rc1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/codegangsta/cli",
+			"Comment": "1.2.0-139-g142e6cd",
+			"Rev": "142e6cd241a4dfbf7f07a018f1f8225180018da4"
+		}
+	]
+}
