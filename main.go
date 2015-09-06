@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/user"
 	"regexp"
 	"strings"
@@ -51,9 +52,11 @@ type Package struct {
 }
 
 var CurrentUser = User{}
+var CurrentPackage = Package{}
 
 func init() {
 	CurrentUser = getCurrentUser()
+	CurrentPackage = getCurrentPackage("")
 	log.Println(CurrentUser)
 }
 
@@ -117,13 +120,14 @@ func main() {
 			Name:    "run",
 			Aliases: []string{"r"},
 			Usage:   "chm run <package>",
-			Action: func(c *cli.Context) {
-				println("Running package ", c.Args().First())
-			},
+			Action:  up,
 		},
 	}
 	app.Run(os.Args)
 }
+func up(c *cli.Context) {
+}
+
 func search(c *cli.Context) {
 	q := c.Args().First()
 	println("Searching for", q+"...")
@@ -157,7 +161,7 @@ description: |
   longer description
 email: your email
 repo_url: your git repo url
-tags: [web, framework]
+tags: web,framework
 `
 	println("please edit package.yml and the run `chm publish`")
 	err := ioutil.WriteFile("package.yml", []byte(yml), 0644)
@@ -182,8 +186,9 @@ func installAction(c *cli.Context) {
 			} else {
 				log.Println(p)
 			}
-
+			exec.Command("git", "clone", p.RepoUrl, ".").Output()
 			println("Package installed successfully!\n")
+			println(p.Description)
 		} else {
 			println(body)
 		}
@@ -199,12 +204,7 @@ func publishAction(c *cli.Context) {
 		println(message)
 		return
 	}
-	p := Package{}
-	data, _ := ioutil.ReadFile("package.yml")
-	err := yaml.Unmarshal(data, &p)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
+	p := getCurrentPackage("")
 	u := "http://plasti.co:3000/publish/" + p.Name
 	fmt.Println(p.Name, p.RepoUrl, p)
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
@@ -442,4 +442,18 @@ func getCurrentUser() User {
 		log.Fatalf("no config found", err)
 	}
 	return u
+}
+
+func getCurrentPackage(pkg string) Package {
+	if pkg == "" {
+		pkg = "package.yml"
+	}
+	p := Package{}
+	data, _ := ioutil.ReadFile(pkg)
+	err := yaml.Unmarshal(data, &p)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	log.Println(p)
+	return p
 }
