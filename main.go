@@ -53,11 +53,15 @@ type Package struct {
 
 var CurrentUser = User{}
 var CurrentPackage = Package{}
+var EndPoint = "https://composehub.org"
 
 func init() {
 	CurrentUser = getCurrentUser()
 	CurrentPackage = getCurrentPackage("")
 	log.Println(CurrentUser)
+	if os.Getenv("ENDPOINT") != "" {
+		EndPoint = os.Getenv("ENDPOINT")
+	}
 }
 
 func main() {
@@ -130,8 +134,8 @@ func up(c *cli.Context) {
 
 func search(c *cli.Context) {
 	q := c.Args().First()
-	println("Searching for", q+"...")
-	if resp, err := http.Get("http://plasti.co:3000/search/" + q); err != nil {
+	println("Searching for", q+" on "+EndPoint+"...")
+	if resp, err := http.Get(EndPoint + "/search/" + q); err != nil {
 		println("Sorry, the query failed with the following message: ", err)
 		return
 	} else {
@@ -172,7 +176,7 @@ tags: web,framework
 
 func installAction(c *cli.Context) {
 	q := c.Args().First()
-	u := "http://plasti.co:3000/packages/" + q
+	u := EndPoint + "/packages/" + q
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Get(u).
 		End(func(resp gorequest.Response, body string, errs []error) {
@@ -205,7 +209,7 @@ func publishAction(c *cli.Context) {
 		return
 	}
 	p := getCurrentPackage("")
-	u := "http://plasti.co:3000/publish/" + p.Name
+	u := EndPoint + "/publish/" + p.Name
 	fmt.Println(p.Name, p.RepoUrl, p)
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Post(u).
@@ -247,7 +251,7 @@ func updateuserAction(c *cli.Context) {
 		if CurrentUser.Email != "" {
 			e, p = CurrentUser.Email, CurrentUser.Password
 		}
-		u := "http://plasti.co:3000/users/" + e
+		u := EndPoint + "/users/" + e
 
 		request := gorequest.New().SetBasicAuth(e, p)
 		request.Put(u).
@@ -273,7 +277,7 @@ func adduserAction(c *cli.Context) {
 		return
 	} else {
 
-		if resp, err := http.PostForm("http://plasti.co:3000/users",
+		if resp, err := http.PostForm(EndPoint+"/users",
 			url.Values{"handle": {handle}, "email": {email}, "password": {password}}); err != nil {
 			println("Sorry, the query failed with the following message: ", err)
 			return
@@ -296,7 +300,7 @@ func resetpassordAction(c *cli.Context) {
 	email, _ := reader.ReadString('\n')
 	email = strings.Replace(email, "\n", "", -1)
 
-	u := "http://plasti.co:3000/users/" + email + "/reset-password"
+	u := EndPoint + "/users/" + email + "/reset-password"
 	request := gorequest.New()
 	request.Post(u).
 		End(func(resp gorequest.Response, body string, errs []error) {
@@ -317,7 +321,7 @@ func resetpassordAction(c *cli.Context) {
 
 func resetPassword(email, token, password string) {
 	log.Println(email, token, password)
-	u := "http://plasti.co:3000/users/" + email + "/reset-password/" + token
+	u := EndPoint + "/users/" + email + "/reset-password/" + token
 	request := gorequest.New()
 	request.Put(u).
 		Send(User{Password: password}).
