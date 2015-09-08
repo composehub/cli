@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/user"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -25,14 +26,15 @@ import (
 )
 
 type User struct {
-	Id        int64  `json:"id"`
-	Name      string `json:"name"`
-	Handle    string `json:"handle"`
-	Email     string `json:"email"`
-	Password  string `json:password`
-	Packages  []Package
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Id          int64  `json:"id"`
+	Name        string `json:"name"`
+	Handle      string `json:"handle"`
+	Email       string `json:"email"`
+	Password    string `json:password`
+	LatestCheck time.Time
+	Packages    []Package
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Package struct {
@@ -54,20 +56,27 @@ type Package struct {
 var CurrentUser = User{}
 var CurrentPackage = Package{}
 var EndPoint = "https://composehub.org"
+var Dev, Version string
 
 func init() {
-	CurrentUser = getCurrentUser()
-	CurrentPackage = getCurrentPackage("")
-	log.Println(CurrentUser)
+	Version = "0.1.0"
 	if os.Getenv("ENDPOINT") != "" {
 		EndPoint = os.Getenv("ENDPOINT")
 	}
+	createConfigDir()
+	CurrentUser = getCurrentUser()
+	checkUpdateCheckFile()
+	updateCheckFile()
+	CurrentPackage = getCurrentPackage("")
+	Dev = os.Getenv("DEV")
+	devlog(CurrentUser)
 }
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "ComposeHub"
 	app.Usage = "Install and publish docker compose packages."
+	app.Version = Version
 	app.Action = func(c *cli.Context) {
 		println("boom! I say!")
 	}
@@ -176,6 +185,11 @@ tags: web,framework
 
 func installAction(c *cli.Context) {
 	q := c.Args().First()
+	if res, err := isEmpty("."); !res || err != nil {
+		println("This dir is not empty. You can only install packages in empty directories.")
+		println("Try `mkdir " + q + " && cd " + q + "`")
+		return
+	}
 	u := EndPoint + "/packages/" + q
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Get(u).
@@ -188,7 +202,7 @@ func installAction(c *cli.Context) {
 				log.Fatalf("no config found", err)
 				return
 			} else {
-				log.Println(p)
+				devlog(p)
 			}
 			exec.Command("git", "clone", p.RepoUrl, ".").Output()
 			println("Package installed successfully!\n")
@@ -268,7 +282,7 @@ func updateuserAction(c *cli.Context) {
 				newPassword = password
 			}
 			CurrentUser = user
-			createCHMDir(user.Handle, user.Email, newPassword)
+			createUserConfig(user.Handle, user.Email, newPassword)
 		})
 	}
 }
@@ -288,7 +302,7 @@ func adduserAction(c *cli.Context) {
 				return
 			} else {
 				fmt.Println(err, string(body))
-				createCHMDir(handle, email, password)
+				createUserConfig(handle, email, password)
 				CurrentUser = getCurrentUser()
 			}
 		}
@@ -320,7 +334,7 @@ func resetpassordAction(c *cli.Context) {
 }
 
 func resetPassword(email, token, password string) {
-	log.Println(email, token, password)
+	devlog(email, token, password)
 	u := EndPoint + "/users/" + email + "/reset-password/" + token
 	request := gorequest.New()
 	request.Put(u).
@@ -336,7 +350,7 @@ func resetPassword(email, token, password string) {
 			}
 			user.Password = password
 			CurrentUser = user
-			createCHMDir(user.Handle, user.Email, user.Password)
+			createUserConfig(user.Handle, user.Email, user.Password)
 		} else {
 			println(body)
 		}
@@ -390,29 +404,25 @@ func promptUserInfo(c *cli.Context, update bool) (string, string, string, error)
 
 }
 
-func createCHMDir(handle, email, password string) {
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
-	}
-	path := usr.HomeDir + "/.composehub"
-	if err := os.Mkdir(path, 0700); err != nil {
+func createUserConfig(handle, email, password string) {
+	if path, err := composeHubConfigPath(); err != nil {
 		fmt.Println(err)
-	}
-	config := `---
+		return
+	} else {
+
+		config := `---
 handle: ` + handle + `
 email: ` + email + `
 password: ` + password + `
 `
-	if err := ioutil.WriteFile(path+"/config.yml", []byte(config), 0600); err != nil {
-		if os.IsExist(err) {
-			fmt.Println("Looks like " + path + "/config.yml already exists, please remove it or edit it manually.")
-		} else {
-			fmt.Println(err)
+		if err := ioutil.WriteFile(path+"/config.yml", []byte(config), 0600); err != nil {
+			if os.IsExist(err) {
+				fmt.Println("Looks like " + path + "/config.yml already exists, please remove it or edit it manually.")
+			} else {
+				fmt.Println(err)
+			}
 		}
-
 	}
-
 }
 
 func validateEmail(email string) bool {
@@ -435,17 +445,17 @@ func newUUID() (string, error) {
 
 func getCurrentUser() User {
 	u := User{}
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatal(err)
+	if path, err := composeHubConfigPath(); err != nil {
+		fmt.Println(err)
+		return u
+	} else {
+		data, _ := ioutil.ReadFile(path + "/config.yml")
+		err = yaml.Unmarshal(data, &u)
+		if err != nil {
+			log.Fatalf("no config found", err)
+		}
+		return u
 	}
-	path := usr.HomeDir + "/.composehub"
-	data, _ := ioutil.ReadFile(path + "/config.yml")
-	err = yaml.Unmarshal(data, &u)
-	if err != nil {
-		log.Fatalf("no config found", err)
-	}
-	return u
 }
 
 func getCurrentPackage(pkg string) Package {
@@ -458,6 +468,103 @@ func getCurrentPackage(pkg string) Package {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	log.Println(p)
+	devlog(p)
 	return p
+}
+
+func devlog(v ...interface{}) {
+	if Dev != "" {
+		devlog(v)
+	}
+}
+
+func isEmpty(name string) (bool, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdir(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err // Either not empty or error, suits both cases
+}
+
+func composeHubConfigPath() (string, error) {
+	if usr, err := user.Current(); err != nil {
+		fmt.Println(err)
+		return "", err
+	} else {
+		path := usr.HomeDir + "/.composehub"
+		return path, err
+	}
+}
+
+func createConfigDir() {
+	if path, err := composeHubConfigPath(); err != nil {
+		fmt.Println(err)
+		return
+	} else {
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				if err := os.Mkdir(path, 0700); err != nil {
+					fmt.Println(err)
+				}
+				// file does not exist
+			} else {
+				fmt.Println(err)
+				// other error
+			}
+		}
+	}
+}
+
+func updateCheckFile() {
+	if path, err := composeHubConfigPath(); err != nil {
+		fmt.Println(err)
+	} else {
+		err := ioutil.WriteFile(path+"/versioncheck", []byte(string(time.Now().Format(time.RFC3339))), 0644)
+		if err != nil {
+			println(err)
+		}
+	}
+}
+
+func checkUpdateCheckFile() {
+	if path, err := composeHubConfigPath(); err != nil {
+		fmt.Println(err)
+	} else {
+		data, _ := ioutil.ReadFile(path + "/versioncheck")
+		t, err := time.Parse(time.RFC3339, string(data))
+		log.Println("since:", time.Since(t), err)
+
+		/*if time.Since(t).Hours() > float64(48) {*/
+		if true {
+			checkForUpdate()
+		}
+	}
+}
+
+func checkForUpdate() {
+	log.Println(EndPoint + "/checkupdate/" + Version)
+	if resp, err := http.Get(EndPoint + "/checkupdate/" + Version); err != nil {
+		println("Sorry, the query failed with the following message: ", err)
+		return
+	} else {
+		defer resp.Body.Close()
+		if body, err := ioutil.ReadAll(resp.Body); err != nil {
+			println("Sorry, the query failed with the following message: ", err)
+			println(string(body))
+			return
+		} else {
+			b := string(body)
+			if b != "\"ok\"" {
+				println("There's a new version " + b + " available")
+				println("curl -L https://composehub.org/install.sh?GOOS=" + runtime.GOOS + "&GOARCH=" + runtime.GOARCH + " > /usr/local/bin/docker-compose")
+			}
+		}
+
+	}
 }
