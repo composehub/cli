@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"os/user"
 	"regexp"
 	"runtime"
 	"strings"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/howeyc/gopass"
+	"github.com/mitchellh/go-homedir"
 	"github.com/parnurzeal/gorequest"
 	"gopkg.in/yaml.v2"
 )
@@ -195,7 +195,6 @@ func installAction(c *cli.Context) {
 	request.Get(u).
 		End(func(resp gorequest.Response, body string, errs []error) {
 		if resp.StatusCode == 200 {
-			println(body)
 			p := Package{}
 
 			if err := json.Unmarshal([]byte(body), &p); err != nil {
@@ -204,6 +203,7 @@ func installAction(c *cli.Context) {
 			} else {
 				devlog(p)
 			}
+			println("Clonning repo...\n")
 			exec.Command("git", "clone", p.RepoUrl, ".").Output()
 			println("Package installed successfully!\n")
 			println(p.Description)
@@ -493,11 +493,11 @@ func isEmpty(name string) (bool, error) {
 }
 
 func composeHubConfigPath() (string, error) {
-	if usr, err := user.Current(); err != nil {
+	if home, err := homedir.Dir(); err != nil {
 		fmt.Println(err)
 		return "", err
 	} else {
-		path := usr.HomeDir + "/.composehub"
+		path := home + "/.composehub"
 		return path, err
 	}
 }
@@ -540,8 +540,8 @@ func checkUpdateCheckFile() {
 		t, err := time.Parse(time.RFC3339, string(data))
 		log.Println("since:", time.Since(t), err)
 
-		/*if time.Since(t).Hours() > float64(48) {*/
-		if true {
+		if time.Since(t).Hours() > float64(48) {
+			/*if true {*/
 			checkForUpdate()
 		}
 	}
