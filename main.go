@@ -46,6 +46,7 @@ type Package struct {
 	Description    string `json:"description"`
 	RepoUrl        string `json:"repo_url" yaml:"repo_url"`
 	Commit         string `json:"commit"`
+	Private        bool   `json:"private"`
 	User           User
 	UserId         int64 `json:"user_id"`
 	TotalDownloads int64 `json:"total_downloads"`
@@ -77,14 +78,13 @@ func main() {
 	app.Name = "ComposeHub"
 	app.Usage = "Install and publish docker compose packages."
 	app.Version = Version
-	app.Action = func(c *cli.Context) {
-		println("boom! I say!")
-	}
+	app.EnableBashCompletion = true
+	app.Action = cli.ShowAppHelp
 	app.Commands = []cli.Command{
 		{
 			Name:    "install",
 			Aliases: []string{"i"},
-			Usage:   "chm install <package> ",
+			Usage:   "chm install <package>",
 			Action:  installAction,
 		},
 		{
@@ -172,9 +172,10 @@ name: package-name
 blurb: 80 chars line blurb
 description: |
   longer description
-email: your email
-repo_url: your git repo url
-tags: web,framework
+email: ` + CurrentUser.Email + `
+repo_url: http://github.com/foo/bar
+tags: tag1,tag2
+private: false
 `
 	println("please edit package.yml and the run `chm publish`")
 	err := ioutil.WriteFile("package.yml", []byte(yml), 0644)
@@ -538,7 +539,7 @@ func checkUpdateCheckFile() {
 	} else {
 		data, _ := ioutil.ReadFile(path + "/versioncheck")
 		t, err := time.Parse(time.RFC3339, string(data))
-		log.Println("since:", time.Since(t), err)
+		devlog("since:", time.Since(t), err)
 
 		if time.Since(t).Hours() > float64(48) {
 			/*if true {*/
@@ -548,7 +549,6 @@ func checkUpdateCheckFile() {
 }
 
 func checkForUpdate() {
-	log.Println(EndPoint + "/checkupdate/" + Version)
 	if resp, err := http.Get(EndPoint + "/checkupdate/" + Version); err != nil {
 		println("Sorry, the query failed with the following message: ", err)
 		return
