@@ -84,55 +84,55 @@ func main() {
 		{
 			Name:    "install",
 			Aliases: []string{"i"},
-			Usage:   "chm install <package>",
+			Usage:   "ch install <package>",
 			Action:  installAction,
 		},
 		{
 			Name:    "search",
 			Aliases: []string{"s"},
-			Usage:   "chm search <package> ",
+			Usage:   "ch search <package> ",
 			Action:  search,
 		},
 		{
 			Name:    "adduser",
 			Aliases: []string{"a"},
-			Usage:   "chm adduser",
+			Usage:   "ch adduser",
 			Action:  adduserAction,
 		},
 		{
 			Name:    "updateuser",
 			Aliases: []string{"uu"},
-			Usage:   "chm updateuser",
+			Usage:   "ch updateuser",
 			Action:  updateuserAction,
 		},
 		{
 			Name:    "publish",
 			Aliases: []string{"p"},
-			Usage:   "chm publish",
+			Usage:   "ch publish",
 			Action:  publishAction,
 		},
 		{
 			Name:    "init",
 			Aliases: []string{"in"},
-			Usage:   "chm init",
+			Usage:   "ch init",
 			Action:  initAction,
 		},
 		{
 			Name:    "configuser",
 			Aliases: []string{"cu"},
-			Usage:   "chm init",
+			Usage:   "ch init",
 			Action:  updateuserAction,
 		},
 		{
 			Name:    "resetpassord",
 			Aliases: []string{"rp"},
-			Usage:   "chm resetpassword",
+			Usage:   "ch resetpassword",
 			Action:  resetpassordAction,
 		},
 		{
 			Name:    "run",
 			Aliases: []string{"r"},
-			Usage:   "chm run <package>",
+			Usage:   "ch run <package>",
 			Action:  up,
 		},
 	}
@@ -177,7 +177,7 @@ repo_url: http://github.com/foo/bar
 tags: tag1,tag2
 private: false
 `
-	println("please edit package.yml and the run `chm publish`")
+	println("please edit package.yml and the run `ch publish`")
 	err := ioutil.WriteFile("package.yml", []byte(yml), 0644)
 	if err != nil {
 		println(err)
@@ -217,15 +217,14 @@ func installAction(c *cli.Context) {
 func publishAction(c *cli.Context) {
 	if CurrentUser.Email == "" {
 		message := `
-        Please create a user account first, run 'chm adduser'
-        If you already have an account, please run 'chm updateuser'
+        Please create a user account first, run 'ch adduser'
+        If you already have an account, please run 'ch updateuser'
 `
 		println(message)
 		return
 	}
 	p := getCurrentPackage("")
 	u := EndPoint + "/publish/" + p.Name
-	fmt.Println(p.Name, p.RepoUrl, p)
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Post(u).
 		Send(p).
