@@ -46,6 +46,7 @@ type Package struct {
 	Description    string `json:"description"`
 	RepoUrl        string `json:"repo_url" yaml:"repo_url"`
 	Commit         string `json:"commit"`
+	Cmd            string `json:"cmd"`
 	Private        bool   `json:"private"`
 	User           User
 	UserId         int64 `json:"user_id"`
@@ -56,11 +57,11 @@ type Package struct {
 
 var CurrentUser = User{}
 var CurrentPackage = Package{}
-var EndPoint = "https://composehub.org"
+var EndPoint = "https://composehub.com"
 var Dev, Version string
 
 func init() {
-	Version = "0.1.0"
+	Version = "0.0.0"
 	if os.Getenv("ENDPOINT") != "" {
 		EndPoint = os.Getenv("ENDPOINT")
 	}
@@ -133,18 +134,29 @@ func main() {
 			Name:    "run",
 			Aliases: []string{"r"},
 			Usage:   "ch run <package>",
-			Action:  up,
+			Action:  runAction,
 		},
 	}
 	app.Run(os.Args)
 }
-func up(c *cli.Context) {
+func runAction(c *cli.Context) {
+	install(c, false)
+	/*wg := new(sync.WaitGroup)*/
+
+	if CurrentPackage.Cmd != "" {
+		cmd := exec.Command("sh", "-c", CurrentPackage.Cmd, ".")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+	} else {
+		println(CurrentPackage.Description)
+	}
 }
 
 func search(c *cli.Context) {
 	q := c.Args().First()
-	println("Searching for", q+" on "+EndPoint+"...")
-	if resp, err := http.Get(EndPoint + "/search/" + q); err != nil {
+	println("Searching for", q+" on https://composehub.com...") /*"+EndPoint+"...")*/
+	if resp, err := http.Get(EndPoint + "/search/" + q + timestamp()); err != nil {
 		println("Sorry, the query failed with the following message: ", err)
 		return
 	} else {
@@ -166,7 +178,7 @@ func search(c *cli.Context) {
 }
 
 func initAction(c *cli.Context) {
-	println("creating package.yml (done)")
+	println("creating composehub.yml (done)")
 	yml := `---
 name: package-name
 blurb: 80 chars line blurb
@@ -176,42 +188,17 @@ email: ` + CurrentUser.Email + `
 repo_url: http://github.com/foo/bar
 tags: tag1,tag2
 private: false
+cmd: 
 `
-	println("please edit package.yml and the run `ch publish`")
-	err := ioutil.WriteFile("package.yml", []byte(yml), 0644)
+	println("please edit composehub.yml and the run `ch publish`")
+	err := ioutil.WriteFile("composehub.yml", []byte(yml), 0644)
 	if err != nil {
 		println(err)
 	}
 }
 
 func installAction(c *cli.Context) {
-	q := c.Args().First()
-	if res, err := isEmpty("."); !res || err != nil {
-		println("This dir is not empty. You can only install packages in empty directories.")
-		println("Try `mkdir " + q + " && cd " + q + "`")
-		return
-	}
-	u := EndPoint + "/packages/" + q
-	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
-	request.Get(u).
-		End(func(resp gorequest.Response, body string, errs []error) {
-		if resp.StatusCode == 200 {
-			p := Package{}
-
-			if err := json.Unmarshal([]byte(body), &p); err != nil {
-				log.Fatalf("no config found", err)
-				return
-			} else {
-				devlog(p)
-			}
-			println("Clonning repo...\n")
-			exec.Command("git", "clone", p.RepoUrl, ".").Output()
-			println("Package installed successfully!\n")
-			println(p.Description)
-		} else {
-			println(body)
-		}
-	})
+	install(c, true)
 }
 
 func publishAction(c *cli.Context) {
@@ -301,7 +288,7 @@ func adduserAction(c *cli.Context) {
 				fmt.Println(err, string(body))
 				return
 			} else {
-				fmt.Println(err, string(body))
+				devlog(err, string(body))
 				createUserConfig(handle, email, password)
 				CurrentUser = getCurrentUser()
 			}
@@ -460,7 +447,7 @@ func getCurrentUser() User {
 
 func getCurrentPackage(pkg string) Package {
 	if pkg == "" {
-		pkg = "package.yml"
+		pkg = "composehub.yml"
 	}
 	p := Package{}
 	data, _ := ioutil.ReadFile(pkg)
@@ -548,7 +535,7 @@ func checkUpdateCheckFile() {
 }
 
 func checkForUpdate() {
-	if resp, err := http.Get(EndPoint + "/checkupdate/" + Version); err != nil {
+	if resp, err := http.Get(EndPoint + "/checkupdate/" + Version + timestamp()); err != nil {
 		println("Sorry, the query failed with the following message: ", err)
 		return
 	} else {
@@ -561,9 +548,66 @@ func checkForUpdate() {
 			b := string(body)
 			if b != "\"ok\"" {
 				println("There's a new version " + b + " available")
-				println("curl -L https://composehub.org/install.sh?GOOS=" + runtime.GOOS + "&GOARCH=" + runtime.GOARCH + " > /usr/local/bin/docker-compose")
+				/*println("curl -L https://composehub.org/install/" + runtime.GOOS + "&GOARCH=" + runtime.GOARCH + " > /usr/local/bin/docker-compose")*/
+				println("curl -L https://composehub.com/install/" + runtime.GOOS)
 			}
 		}
 
 	}
 }
+
+func install(c *cli.Context, showDescription bool) Package {
+	p := Package{}
+	q := c.Args().First()
+	if res, err := isEmpty("."); !res || err != nil {
+		println("This dir is not empty. You can only install packages in empty directories.")
+		println("Try `mkdir " + q + " && cd " + q + "`")
+		return p
+	}
+	u := EndPoint + "/packages/" + q + timestamp()
+	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
+	request.Get(u).
+		End(func(resp gorequest.Response, body string, errs []error) {
+		if resp.StatusCode == 200 {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				log.Fatalf("no config found", err)
+				return
+			} else {
+				CurrentPackage = p
+				devlog(p)
+			}
+			/*println("Cloning repo...\n")*/
+			cmd := exec.Command("git", "clone", p.RepoUrl, ".")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Run()
+			println("Package installed successfully!\n")
+			if showDescription {
+				println(p.Description)
+			}
+		} else {
+			println(body)
+		}
+	})
+	return p
+}
+
+func timestamp() string {
+	return "?t=" + time.Now().UTC().Format("20060102150405")
+}
+
+/*mkdir my-gitlab*/
+/*cd my-gitlab*/
+/*ch search gitlab*/
+/*ch install gitlab*/
+/*docker-compose up*/
+
+/*cd ..*/
+/*mkdir my-wordpress*/
+/*cd my-wordpress*/
+/*ch search run wordpress*/
+
+/*mkdir my-rails-app*/
+/*cd my-rails-app*/
+/*ch install rails*/
+/*docker-compose run web bundle install*/
