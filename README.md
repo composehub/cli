@@ -19,13 +19,13 @@ Composehub solves this problem by providing an easy way to search for docker-com
 ## Install on OSX:
 
 ```
-curl -L https://composehub.com/install/darwin > /usr/local/bin/ch
+curl -L https://composehub.com/install/darwin > /usr/local/bin/ch && chmod +x /usr/local/bin/ch
 ```
 
 ## Install on Linux:
 
 ```
-curl -L https://composehub.com/install/linux > /usr/local/bin/ch
+curl -L https://composehub.com/install/linux > /usr/local/bin/ch && chmod +x /usr/local/bin/ch
 ```
 
 ## Install on Windows:
@@ -69,8 +69,7 @@ This will return a list of packages having gitlab in their name or description, 
 ## Install apps
 
 ```
-mkdir gitlab && cd gitlab
-ch install gitlab
+ch install gitlab && cd gitlab
 ```
 
 Before installing an app, make sure your current directory is empty. Installing the app will clone the repo containing the docker-compose.yml file. Once the installation is done, just run the usual ```docker-compose up```. If there are additional commands to execute before, they will be shown at the end of the install.
@@ -78,7 +77,6 @@ Before installing an app, make sure your current directory is empty. Installing 
 ## Run apps
 
 ```
-mkdir wordpress && cd wordpress
 ch run wordpress
 ```
 

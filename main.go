@@ -61,7 +61,7 @@ var EndPoint = "https://composehub.com"
 var Dev, Version string
 
 func init() {
-	Version = "0.0.0"
+	Version = "0.0.1"
 	if os.Getenv("ENDPOINT") != "" {
 		EndPoint = os.Getenv("ENDPOINT")
 	}
@@ -125,7 +125,7 @@ func main() {
 			Action:  updateuserAction,
 		},
 		{
-			Name:    "resetpassord",
+			Name:    "resetpassword",
 			Aliases: []string{"rp"},
 			Usage:   "ch resetpassword",
 			Action:  resetpassordAction,
@@ -144,6 +144,10 @@ func runAction(c *cli.Context) {
 	/*wg := new(sync.WaitGroup)*/
 
 	if CurrentPackage.Cmd != "" {
+		/*out, err := sh.Command("cd", CurrentPackage.Name).Command("sh", "-c", CurrentPackage.Cmd, ".").SetStdin(os.Stdin).Output()*/
+		/*log.Println(err)*/
+		/*log.Println(out)*/
+		os.Chdir(CurrentPackage.Name)
 		cmd := exec.Command("sh", "-c", CurrentPackage.Cmd, ".")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -461,7 +465,7 @@ func getCurrentPackage(pkg string) Package {
 
 func devlog(v ...interface{}) {
 	if Dev != "" {
-		devlog(v)
+		log.Println(v)
 	}
 }
 
@@ -559,11 +563,11 @@ func checkForUpdate() {
 func install(c *cli.Context, showDescription bool) Package {
 	p := Package{}
 	q := c.Args().First()
-	if res, err := isEmpty("."); !res || err != nil {
-		println("This dir is not empty. You can only install packages in empty directories.")
-		println("Try `mkdir " + q + " && cd " + q + "`")
-		return p
-	}
+	/*if res, err := isEmpty("."); !res || err != nil {*/
+	/*println("This dir is not empty. You can only install packages in empty directories.")*/
+	/*println("Try `mkdir " + q + " && cd " + q + "`")*/
+	/*return p*/
+	/*}*/
 	u := EndPoint + "/packages/" + q + timestamp()
 	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Get(u).
@@ -577,13 +581,19 @@ func install(c *cli.Context, showDescription bool) Package {
 				devlog(p)
 			}
 			/*println("Cloning repo...\n")*/
-			cmd := exec.Command("git", "clone", p.RepoUrl, ".")
+			cmd := exec.Command("git", "clone", p.RepoUrl, q)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			cmd.Run()
-			println("Package installed successfully!\n")
+			println("Package installed successfully in " + q + "!\n")
 			if showDescription {
 				println(p.Description)
+			} else {
+				/*cmd := exec.Command("cd", q)*/
+				/*cmd.Stdout = os.Stdout*/
+				/*cmd.Stderr = os.Stderr*/
+				/*cmd.Run()*/
+
 			}
 		} else {
 			println(body)
