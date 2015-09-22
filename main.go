@@ -216,7 +216,7 @@ func publishAction(c *cli.Context) {
 	}
 	p := getCurrentPackage("")
 	u := EndPoint + "/publish/" + p.Name
-	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
+	request := goreq().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Post(u).
 		Send(p).
 		End(func(resp gorequest.Response, body string, errs []error) {
@@ -258,7 +258,7 @@ func updateuserAction(c *cli.Context) {
 		}
 		u := EndPoint + "/users/" + e
 
-		request := gorequest.New().SetBasicAuth(e, p)
+		request := goreq().SetBasicAuth(e, p)
 		request.Put(u).
 			Send(user).
 			End(func(resp gorequest.Response, body string, errs []error) {
@@ -306,7 +306,7 @@ func resetpassordAction(c *cli.Context) {
 	email = strings.Replace(email, "\n", "", -1)
 
 	u := EndPoint + "/users/" + email + "/reset-password"
-	request := gorequest.New()
+	request := goreq()
 	request.Post(u).
 		End(func(resp gorequest.Response, body string, errs []error) {
 		if resp.StatusCode == 200 {
@@ -327,7 +327,7 @@ func resetpassordAction(c *cli.Context) {
 func resetPassword(email, token, password string) {
 	devlog(email, token, password)
 	u := EndPoint + "/users/" + email + "/reset-password/" + token
-	request := gorequest.New()
+	request := goreq()
 	request.Put(u).
 		Send(User{Password: password}).
 		End(func(resp gorequest.Response, body string, errs []error) {
@@ -569,7 +569,7 @@ func install(c *cli.Context, showDescription bool) Package {
 	/*return p*/
 	/*}*/
 	u := EndPoint + "/packages/" + q + timestamp()
-	request := gorequest.New().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
+	request := goreq().SetBasicAuth(CurrentUser.Email, CurrentUser.Password)
 	request.Get(u).
 		End(func(resp gorequest.Response, body string, errs []error) {
 		if resp.StatusCode == 200 {
@@ -604,6 +604,14 @@ func install(c *cli.Context, showDescription bool) Package {
 
 func timestamp() string {
 	return "?t=" + time.Now().UTC().Format("20060102150405")
+}
+
+func goreq() *gorequest.SuperAgent {
+	request := gorequest.New()
+	if os.Getenv("https_proxy") != "" {
+		request.Proxy(os.Getenv("https_proxy"))
+	}
+	return request
 }
 
 /*mkdir my-gitlab*/
