@@ -136,4 +136,4 @@ private: false
 cmd: docker-compose up
 ```
 
-The description will be displayed at the end of the install process of your package, use it to document any post-install required tasks. ```cmd``` is the command that will be ran when the user executes ```ch run <package>```, it is optional and can just be left blank. ```private``` if you set private to true, only you will be able to install the app and it will not appear online or in search results.
+The description will be displayed at the end of the install process of your package, use it to document any post-install required tasks. ```cmd``` is the command that will be ran when the user executes ```ch run <package>```, it is optional and can just be left blank. ```private``` if you set private to true, only you will be able to install the app and it will not appear online or in search results, this requires you to have your composehub account configured on your host.
