@@ -72,7 +72,7 @@ This will return a list of packages having gitlab in their name or description, 
 ch install gitlab && cd gitlab
 ```
 
-Before installing an app, make sure your current directory is empty. Installing the app will clone the repo containing the docker-compose.yml file. Once the installation is done, just run the usual ```docker-compose up```. If there are additional commands to execute before, they will be shown at the end of the install.
+Before installing an app, make sure your current directory is empty. Installing the app will clone the repo containing the docker-compose.yml file. Once the installation is done, just run the usual ```docker-compose up -d```. If there are additional commands to execute before, they will be shown at the end of the install.
 
 ## Run apps
 
